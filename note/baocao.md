@@ -803,6 +803,5 @@ Nếu còn blocker về auth, workspace isolation, permission, activity log, not
 
 <a id="sec-12-demo-conclusion"></a>
 ### 12.8. Kết luận cho phần Demo
-Nếu mục tiêu của buổi demo là thuyết phục team rằng AI agent có thể làm việc theo chuẩn kỹ sư senior thay vì chỉ sinh code nhanh, thì TaskFlow là case study phù hợp: PRD có đủ 12 FR, 5 US, acceptance criteria, edge cases và NFR để KIT chứng minh năng lực điều phối từ spec đến ship.
 
 Nói ngắn gọn: **Agent Skills KIT không chỉ giúp “làm ra tính năng”, mà giúp biến toàn bộ PRD thành một workflow phát triển có kiểm soát, có bằng chứng và có cơ chế chặn lỗi trước khi ship.**
