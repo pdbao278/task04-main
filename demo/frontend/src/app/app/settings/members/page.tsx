@@ -15,6 +15,7 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
 
   useEffect(() => {
     if (workspace) fetchMembers();
@@ -40,11 +41,12 @@ export default function MembersPage() {
     setLoading(true);
 
     try {
-      await api.post(`/workspaces/${workspace!.id}/invite`, {
+      const res = await api.post<{ data: { inviteLink?: string } }>(`/workspaces/${workspace!.id}/invite`, {
         email: inviteEmail,
         role: inviteRole,
       });
       setSuccess(`Đã gửi lời mời đến ${inviteEmail}`);
+      if (res.data.inviteLink) setInviteLink(res.data.inviteLink);
       setInviteEmail('');
       fetchMembers();
     } catch (err: unknown) {
@@ -118,7 +120,21 @@ export default function MembersPage() {
               fontSize: '0.8125rem',
               marginBottom: '1rem',
             }}>
-              {success}
+              <div>{success}</div>
+              {inviteLink && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <div style={{ fontSize: '0.6875rem', color: 'var(--c-text-3)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-display), Space Mono, monospace' }}>
+                    Copy link gửi cho thành viên:
+                  </div>
+                  <input
+                    className="input"
+                    value={inviteLink}
+                    readOnly
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    style={{ fontSize: '0.75rem', color: 'var(--c-text)', background: 'var(--c-bg)', cursor: 'text' }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -247,6 +263,18 @@ export default function MembersPage() {
                   >
                     <div style={{ fontSize: '0.875rem' }}>{invite.email}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {invite.inviteLink && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: '0.6875rem' }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(invite.inviteLink!);
+                            alert('Đã copy link mời!');
+                          }}
+                        >
+                          📋 Copy link
+                        </button>
+                      )}
                       <span className="badge badge-pending">Pending</span>
                       <span className={`badge badge-${invite.role.toLowerCase()}`}>
                         {invite.role}
@@ -257,6 +285,87 @@ export default function MembersPage() {
               </div>
             </>
           )}
+        </div>
+
+        {/* ─── Workspace Settings ────────────────────────── */}
+        <div className="card" style={{ marginTop: '1.5rem' }}>
+          <h2 style={{
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            fontFamily: 'var(--font-display), Space Mono, monospace',
+            letterSpacing: '0.03em',
+            textTransform: 'uppercase',
+            color: 'var(--c-text-2)',
+            marginBottom: '1rem',
+          }}>
+            Cài đặt Workspace
+          </h2>
+
+          {/* Rename */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label className="label">Tên workspace</label>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const input = (e.target as HTMLFormElement).elements.namedItem('wsName') as HTMLInputElement;
+                if (!input.value.trim() || !workspace) return;
+                try {
+                  await api.patch(`/workspaces/${workspace.id}`, { name: input.value.trim() });
+                  setSuccess('Đã đổi tên workspace');
+                  // Update store
+                  const { selectWorkspace } = useAuthStore.getState();
+                  selectWorkspace({ ...workspace, name: input.value.trim() });
+                } catch {
+                  setError('Không thể đổi tên workspace');
+                }
+              }}
+              style={{ display: 'flex', gap: '0.5rem' }}
+            >
+              <input
+                name="wsName"
+                className="input"
+                defaultValue={workspace?.name || ''}
+                style={{ flex: 1 }}
+              />
+              <button type="submit" className="btn btn-primary btn-sm">
+                Lưu
+              </button>
+            </form>
+          </div>
+
+          {/* Delete */}
+          <div style={{
+            paddingTop: '1rem',
+            borderTop: '1px solid var(--c-border)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 500, fontSize: '0.875rem', color: 'var(--c-danger)' }}>
+                  Xóa workspace
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--c-text-3)' }}>
+                  Xóa vĩnh viễn workspace và toàn bộ dữ liệu. Không thể hoàn tác.
+                </div>
+              </div>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={async () => {
+                  if (!workspace) return;
+                  if (!confirm(`Xóa workspace "${workspace.name}"? Mọi project, task, thành viên sẽ bị xóa vĩnh viễn.`)) return;
+                  try {
+                    await api.delete(`/workspaces/${workspace.id}`);
+                    // Clear and reload
+                    localStorage.removeItem('workspaceId');
+                    window.location.href = '/app/my-tasks';
+                  } catch {
+                    setError('Không thể xóa workspace');
+                  }
+                }}
+              >
+                Xóa workspace
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>

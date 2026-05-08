@@ -8,6 +8,10 @@ import authRoutes from './routes/auth';
 import workspaceRoutes from './routes/workspace';
 import projectRoutes from './routes/project';
 import taskRoutes from './routes/task';
+import myTasksRoutes from './routes/my-tasks';
+import searchRoutes from './routes/search';
+import notificationRoutes from './routes/notification';
+import reportRoutes from './routes/report';
 import { errorHandler } from './middleware/error.middleware';
 
 const app = express();
@@ -41,6 +45,10 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/workspaces', workspaceRoutes);
 app.use('/api/v1/projects', projectRoutes);
 app.use('/api/v1/tasks', taskRoutes);
+app.use('/api/v1/my-tasks', myTasksRoutes);
+app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/reports', reportRoutes);
 
 // ─── Error Handler (must be last) ─────────────────────────
 app.use(errorHandler);

@@ -203,9 +203,9 @@ describe('GET /api/v1/tasks/:id', () => {
 });
 
 describe('PATCH /api/v1/tasks/:id', () => {
-  it('should update status and create activity log', async () => {
+  it('should update status via dedicated endpoint and create activity log', async () => {
     const res = await request(app)
-      .patch(`/api/v1/tasks/${taskId}`)
+      .patch(`/api/v1/tasks/${taskId}/status`)
       .set('Authorization', `Bearer ${accessToken}`)
       .set('x-workspace-id', workspaceId)
       .send({ status: 'IN_PROGRESS' })

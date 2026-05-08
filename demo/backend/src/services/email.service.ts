@@ -14,13 +14,13 @@ export async function sendEmail({ to, subject, htmlContent }: SendEmailParams): 
   const senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@taskflow.app';
   const senderName = process.env.BREVO_SENDER_NAME || 'TaskFlow';
 
-  // In development, just log the email
-  if (process.env.NODE_ENV === 'development' || !apiKey || apiKey === 'your-brevo-api-key') {
-    console.log('━━━ EMAIL (dev mode) ━━━');
+  // Skip sending if no real API key configured
+  if (!apiKey || apiKey === 'your-brevo-api-key') {
+    console.log('━━━ EMAIL (no API key) ━━━');
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
     console.log(`Content: ${htmlContent}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━');
     return;
   }
 

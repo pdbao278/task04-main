@@ -27,7 +27,8 @@ function LoginContent() {
     try {
       const res = await api.post<LoginResponse>('/auth/login', { email, password });
       login(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.push('/app/my-tasks');
+      const redirectTo = searchParams.get('redirect') || '/app/my-tasks';
+      router.push(redirectTo);
     } catch (err: unknown) {
       const apiErr = err as { error?: string };
       setError(apiErr?.error || 'Đã xảy ra lỗi');

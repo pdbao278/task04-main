@@ -1,8 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
-import { CreateTaskSchema, UpdateTaskSchema } from '../types/task.types';
+import { Prisma, TaskStatus, Priority as PriorityEnum } from '@prisma/client';
+import { CreateTaskSchema, UpdateTaskSchema, StatusChangeSchema } from '../types/task.types';
 import { sanitizeInput } from '../utils/sanitize';
-import { BadRequestError, NotFoundError } from '../utils/errors';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../utils/errors';
+import { createActivityLog, getTaskActivities as fetchTaskActivities, ActionType } from '../services/activity.service';
+
+const VALID_STATUSES = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] as const;
+const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
 
 /**
  * POST /api/v1/tasks
@@ -56,7 +61,7 @@ export async function createTask(req: Request, res: Response, next: NextFunction
         data: {
           taskId: created.id,
           userId: req.user!.id,
-          actionType: 'CREATED',
+          actionType: ActionType.CREATED,
         },
       });
 
@@ -75,19 +80,45 @@ export async function createTask(req: Request, res: Response, next: NextFunction
  */
 export async function listTasks(req: Request, res: Response, next: NextFunction) {
   try {
-    const { projectId, status, assigneeId, priority, search } = req.query;
+    const { projectId, status, assigneeId, priority, search, dueBefore, dueAfter } = req.query;
 
-    const where: Record<string, unknown> = {
+    const where: Prisma.TaskWhereInput = {
       workspaceId: req.workspace!.id,
       deletedAt: null,
     };
 
     if (projectId) where.projectId = projectId as string;
-    if (status) where.status = status as string;
+    if (status) {
+      if (!VALID_STATUSES.includes(status as typeof VALID_STATUSES[number])) {
+        throw new BadRequestError(`Status không hợp lệ. Chấp nhận: ${VALID_STATUSES.join(', ')}`);
+      }
+      where.status = status as TaskStatus;
+    }
     if (assigneeId) where.assigneeId = assigneeId as string;
-    if (priority) where.priority = priority as string;
+    if (priority) {
+      if (!VALID_PRIORITIES.includes(priority as typeof VALID_PRIORITIES[number])) {
+        throw new BadRequestError(`Priority không hợp lệ. Chấp nhận: ${VALID_PRIORITIES.join(', ')}`);
+      }
+      where.priority = priority as PriorityEnum;
+    }
     if (search) {
       where.title = { contains: search as string, mode: 'insensitive' };
+    }
+
+    // Due date range filter — FR-08 Team Dashboard
+    if (dueBefore || dueAfter) {
+      const dueFilter: Prisma.DateTimeNullableFilter = {};
+      if (dueAfter) {
+        const d = new Date(dueAfter as string);
+        if (isNaN(d.getTime())) throw new BadRequestError('dueAfter không hợp lệ (ISO 8601)');
+        dueFilter.gte = d;
+      }
+      if (dueBefore) {
+        const d = new Date(dueBefore as string);
+        if (isNaN(d.getTime())) throw new BadRequestError('dueBefore không hợp lệ (ISO 8601)');
+        dueFilter.lte = d;
+      }
+      where.dueDate = dueFilter;
     }
 
     const tasks = await prisma.task.findMany({
@@ -98,6 +129,7 @@ export async function listTasks(req: Request, res: Response, next: NextFunction)
         creator: { select: { id: true, name: true } },
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 200, // safe guard — paginate in v2 if needed
     });
 
     res.json({ data: tasks });
@@ -175,10 +207,7 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
       updateData.priority = data.priority;
       activityLogs.push({ fieldChanged: 'priority', oldValue: existing.priority, newValue: data.priority });
     }
-    if (data.status !== undefined && data.status !== existing.status) {
-      updateData.status = data.status;
-      activityLogs.push({ fieldChanged: 'status', oldValue: existing.status, newValue: data.status });
-    }
+    // NOTE: status intentionally not handled here — must use PATCH /tasks/:id/status
     if (data.assigneeId !== undefined && data.assigneeId !== existing.assigneeId) {
       updateData.assigneeId = data.assigneeId;
       activityLogs.push({ fieldChanged: 'assignee', oldValue: existing.assigneeId, newValue: data.assigneeId ?? null });
@@ -215,7 +244,7 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
           data: {
             taskId,
             userId: req.user!.id,
-            actionType: 'UPDATED',
+            actionType: ActionType.UPDATED,
             ...log,
           },
         })
@@ -251,12 +280,97 @@ export async function deleteTask(req: Request, res: Response, next: NextFunction
         data: {
           taskId,
           userId: req.user!.id,
-          actionType: 'DELETED',
+          actionType: ActionType.DELETED,
         },
       }),
     ]);
 
     res.json({ message: 'Task đã được xóa' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PATCH /api/v1/tasks/:id/status
+ * Change task status with permission check:
+ * - Admin / Manager: can change any task in workspace
+ * - Member: can only change tasks assigned to them
+ */
+export async function changeTaskStatus(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { status } = StatusChangeSchema.parse(req.body);
+    const taskId = req.params.id as string;
+    const userId = req.user!.id;
+    const role = req.workspace!.role;
+
+    const task = await prisma.task.findFirst({
+      where: { id: taskId, workspaceId: req.workspace!.id, deletedAt: null },
+    });
+
+    if (!task) throw new NotFoundError('Task không tồn tại');
+
+    // Permission check: Admin/Manager can change any task; Member only their own
+    if (role === 'MEMBER' && task.assigneeId !== userId) {
+      throw new ForbiddenError('Chỉ assignee hoặc Manager mới có thể đổi trạng thái');
+    }
+
+    // No change needed
+    if (task.status === status) {
+      return res.json({ data: task, message: 'Không có thay đổi' });
+    }
+
+    const oldStatus = task.status;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.task.update({
+        where: { id: taskId },
+        data: { status },
+        include: {
+          project: { select: { id: true, name: true, color: true } },
+          assignee: { select: { id: true, name: true, email: true } },
+          creator: { select: { id: true, name: true } },
+        },
+      });
+
+      await tx.activityLog.create({
+        data: {
+          taskId,
+          userId,
+          actionType: ActionType.STATUS_CHANGED,
+          fieldChanged: 'status',
+          oldValue: oldStatus,
+          newValue: status,
+        },
+      });
+
+      return result;
+    });
+
+    res.json({ data: updated });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/v1/tasks/:id/activities
+ * List activity logs for a task
+ */
+export async function getActivities(req: Request, res: Response, next: NextFunction) {
+  try {
+    const taskId = req.params.id as string;
+
+    // Verify task exists in workspace
+    const task = await prisma.task.findFirst({
+      where: { id: taskId, workspaceId: req.workspace!.id },
+    });
+
+    if (!task) throw new NotFoundError('Task không tồn tại');
+
+    const activities = await fetchTaskActivities(taskId);
+
+    res.json({ data: activities });
   } catch (error) {
     next(error);
   }

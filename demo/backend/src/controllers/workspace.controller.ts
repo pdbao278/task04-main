@@ -90,8 +90,10 @@ export async function listMembers(req: Request, res: Response, next: NextFunctio
         acceptedAt: null,
         expiresAt: { gt: new Date() },
       },
-      select: { id: true, email: true, role: true, expiresAt: true, createdAt: true },
+      select: { id: true, email: true, role: true, token: true, expiresAt: true, createdAt: true },
     });
+
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
     res.json({
       data: {
@@ -103,7 +105,14 @@ export async function listMembers(req: Request, res: Response, next: NextFunctio
           role: m.role,
           joinedAt: m.joinedAt,
         })),
-        pendingInvites,
+        pendingInvites: pendingInvites.map((inv) => ({
+          id: inv.id,
+          email: inv.email,
+          role: inv.role,
+          expiresAt: inv.expiresAt,
+          createdAt: inv.createdAt,
+          inviteLink: `${appUrl}/invite?token=${inv.token}`,
+        })),
       },
     });
   } catch (error) {
@@ -170,12 +179,16 @@ export async function inviteMember(req: Request, res: Response, next: NextFuncti
     // Send invite email
     await sendInviteEmail(data.email, token, workspace!.name);
 
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const inviteLink = `${appUrl}/invite?token=${token}`;
+
     res.status(201).json({
       data: {
         id: invite.id,
         email: invite.email,
         role: invite.role,
         expiresAt: invite.expiresAt,
+        inviteLink,
       },
     });
   } catch (error) {
@@ -258,7 +271,7 @@ export async function acceptInvite(req: Request, res: Response, next: NextFuncti
     res.json({
       data: {
         message: 'Đã tham gia workspace thành công.',
-        workspace: invite.workspace,
+        workspace: { ...invite.workspace, role: invite.role },
       },
     });
   } catch (error) {
@@ -333,6 +346,47 @@ export async function removeMember(req: Request, res: Response, next: NextFuncti
     await prisma.workspaceMember.delete({ where: { id: memberId } });
 
     res.json({ message: 'Đã xóa thành viên khỏi workspace' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PATCH /api/v1/workspaces/:id
+ * Update workspace name (Admin only)
+ */
+export async function updateWorkspace(req: Request, res: Response, next: NextFunction) {
+  try {
+    const data = CreateWorkspaceSchema.parse(req.body);
+
+    const updated = await prisma.workspace.update({
+      where: { id: req.workspace!.id },
+      data: { name: data.name },
+      select: { id: true, name: true, createdAt: true },
+    });
+
+    res.json({ data: updated });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/v1/workspaces/:id
+ * Delete workspace and all related data (Admin only)
+ */
+export async function deleteWorkspace(req: Request, res: Response, next: NextFunction) {
+  try {
+    const workspaceId = req.workspace!.id;
+
+    // Delete in order: invites, members, then workspace (cascade handles tasks etc.)
+    await prisma.$transaction([
+      prisma.inviteToken.deleteMany({ where: { workspaceId } }),
+      prisma.workspaceMember.deleteMany({ where: { workspaceId } }),
+      prisma.workspace.delete({ where: { id: workspaceId } }),
+    ]);
+
+    res.json({ message: 'Đã xóa workspace' });
   } catch (error) {
     next(error);
   }

@@ -27,5 +27,12 @@ export const UpdateTaskSchema = z.object({
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   assigneeId: z.string().uuid().optional().nullable(),
   dueDate: z.string().datetime().optional().nullable(),
-  status: z.enum(['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE']).optional(),
+  // NOTE: status intentionally excluded — must use PATCH /tasks/:id/status for permission check
+});
+
+export const StatusChangeSchema = z.object({
+  status: z.enum(['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'], {
+    required_error: 'Status là bắt buộc',
+    invalid_type_error: 'Status không hợp lệ',
+  }),
 });

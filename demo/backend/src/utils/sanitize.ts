@@ -15,9 +15,9 @@ export function sanitizeHtml(input: string): string {
     .replace(/javascript\s*:/gi, '')
     // Remove style expressions
     .replace(/expression\s*\(/gi, '')
-    // Remove iframe, embed, object tags
-    .replace(/<\s*(iframe|embed|object|form)\b[^>]*>.*?<\/\s*\1\s*>/gi, '')
-    .replace(/<\s*(iframe|embed|object|form)\b[^>]*\/?>/gi, '');
+    // Remove iframe, embed, object, img, svg tags
+    .replace(/<\s*(iframe|embed|object|form|svg)\b[^>]*>.*?<\/\s*\1\s*>/gi, '')
+    .replace(/<\s*(iframe|embed|object|form|img|svg)\b[^>]*\/?>/gi, '');
 }
 
 /**
@@ -31,4 +31,18 @@ export function sanitizeInput<T extends Record<string, unknown>>(data: T): T {
     }
   }
   return sanitized;
+}
+
+/**
+ * Escape HTML entities — safe for plaintext content (comments)
+ * Prevents all HTML injection by converting special chars to entities.
+ */
+export function escapeHtml(input: string): string {
+  if (!input) return input;
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

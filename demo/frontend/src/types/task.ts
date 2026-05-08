@@ -71,3 +71,23 @@ export interface UpdateTaskInput {
   dueDate?: string | null;
   status?: TaskStatus;
 }
+
+export interface Comment {
+  id: string;
+  taskId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  user?: { id: string; name: string };
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'COMMENT' | 'TASK_ASSIGNED' | 'DUE_SOON' | 'MENTION';
+  referenceId?: string | null;
+  referenceType?: string | null;
+  message: string;
+  readAt?: string | null;
+  createdAt: string;
+}

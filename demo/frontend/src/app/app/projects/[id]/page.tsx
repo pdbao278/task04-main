@@ -4,6 +4,10 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
+import { Header } from '@/components/layout/header';
+import { StatusDropdown } from '@/components/task/status-dropdown';
+import { ActivityTab } from '@/components/task/activity-tab';
+import { CommentTab } from '@/components/task/comment-tab';
 import type { Project, Task, CreateTaskInput, Priority, TaskStatus } from '@/types/task';
 import type { WorkspaceMember } from '@/types/user';
 
@@ -32,6 +36,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { id: projectId } = use(params);
   const router = useRouter();
   const workspace = useAuthStore((s) => s.workspace);
+  const currentUser = useAuthStore((s) => s.user);
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
@@ -47,6 +52,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   // Task detail slide-over
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [activityRefresh, setActivityRefresh] = useState(0);
+  const [detailTab, setDetailTab] = useState<'comments' | 'activity'>('comments');
 
   async function loadData() {
     try {
@@ -88,15 +95,25 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleStatusChange(taskId: string, status: TaskStatus) {
-    try {
-      await api.patch(`/tasks/${taskId}`, { status });
-      loadData();
-      if (selectedTask?.id === taskId) {
-        setSelectedTask({ ...selectedTask!, status });
-      }
-    } catch {
-      console.error('Status change failed');
+    // Use the dedicated status endpoint with permission check
+    await api.patch(`/tasks/${taskId}/status`, { status });
+    loadData();
+    setActivityRefresh((n) => n + 1);
+    if (selectedTask?.id === taskId) {
+      setSelectedTask({ ...selectedTask!, status });
     }
+  }
+
+  /**
+   * FR-05: Permission check — can user change this task's status?
+   * Admin / Manager can change any task
+   * Member can only change tasks assigned to them
+   */
+  function canChangeTaskStatus(task: Task): boolean {
+    if (!workspace || !currentUser) return false;
+    const role = workspace.role;
+    if (role === 'ADMIN' || role === 'MANAGER') return true;
+    return task.assigneeId === currentUser.id;
   }
 
   async function handleDeleteTask(taskId: string) {
@@ -141,7 +158,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div>
+    <>
+      <Header title={project.name} />
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
         <button
@@ -156,7 +175,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           backgroundColor: project.color,
           boxShadow: `0 0 8px ${project.color}66`,
         }} />
-        <h1 className="page-title" style={{ margin: 0 }}>{project.name}</h1>
+        <h2 style={{
+          fontFamily: 'var(--font-display), Space Mono, monospace',
+          fontWeight: 700,
+          margin: 0,
+          fontSize: '1rem',
+          letterSpacing: '-0.02em',
+        }}>{project.name}</h2>
         {project.archivedAt && <span className="badge badge-warning">Archived</span>}
       </div>
 
@@ -382,7 +407,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             width: '440px', maxWidth: '90vw',
             backgroundColor: 'var(--c-bg-raised)',
             borderLeft: '1px solid var(--c-border)',
-            boxShadow: '-8px 0 40px rgba(0,0,0,0.5)',
+            boxShadow: '-8px 0 40px rgba(0,0,0,0.12)',
             zIndex: 999, overflowY: 'auto', padding: '1.5rem',
             animation: 'slideIn 0.3s var(--ease-out)',
           }}>
@@ -406,18 +431,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               >✕</button>
             </div>
 
-            {/* Status changer */}
+            {/* Status changer — FR-05 with permission check */}
             <div className="form-group">
               <label className="label">Status</label>
-              <select
-                className="input"
-                value={selectedTask.status}
-                onChange={(e) => handleStatusChange(selectedTask.id, e.target.value as TaskStatus)}
-              >
-                {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
-                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                ))}
-              </select>
+              <StatusDropdown
+                taskId={selectedTask.id}
+                currentStatus={selectedTask.status}
+                canChangeStatus={canChangeTaskStatus(selectedTask)}
+                onStatusChange={handleStatusChange}
+              />
+              {!canChangeTaskStatus(selectedTask) && (
+                <div style={{
+                  fontSize: '0.6875rem',
+                  color: 'var(--c-text-3)',
+                  marginTop: '0.25rem',
+                  fontStyle: 'italic',
+                }}>Chỉ assignee hoặc Manager mới có thể đổi trạng thái</div>
+              )}
             </div>
 
             {/* Details grid */}
@@ -485,54 +515,46 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </div>
             )}
 
-            {/* Activity Log */}
-            {selectedTask.activityLogs && selectedTask.activityLogs.length > 0 && (
-              <div>
-                <h4 className="label">Activity Log</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  {selectedTask.activityLogs.map((log) => (
-                    <div key={log.id} style={{
-                      padding: '0.5rem 0.75rem',
-                      backgroundColor: 'var(--c-bg)',
-                      border: '1px solid var(--c-border)',
-                      borderRadius: 'var(--r-sm)',
+            {/* Tabs: Comments + Activity — FR-06, FR-10 */}
+            <div>
+              <div style={{
+                display: 'flex', gap: '0.25rem', marginBottom: '0.75rem',
+                borderBottom: '1px solid var(--c-border)',
+              }}>
+                {(['comments', 'activity'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setDetailTab(tab)}
+                    style={{
+                      padding: '0.375rem 0.75rem',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: detailTab === tab ? '2px solid var(--c-accent)' : '2px solid transparent',
+                      color: detailTab === tab ? 'var(--c-accent)' : 'var(--c-text-3)',
+                      fontWeight: detailTab === tab ? 700 : 400,
                       fontSize: '0.75rem',
-                      color: 'var(--c-text-3)',
-                    }}>
-                      <span style={{ fontWeight: 600, color: 'var(--c-text-2)' }}>{log.user?.name}</span>
-                      {' '}
-                      {log.actionType === 'CREATED' && 'đã tạo task'}
-                      {log.actionType === 'UPDATED' && log.fieldChanged && (
-                        <>
-                          đã đổi <strong style={{ color: 'var(--c-accent)' }}>{log.fieldChanged}</strong>
-                          {log.oldValue && <> từ <code style={{
-                            fontSize: '0.6875rem',
-                            background: 'var(--c-surface)',
-                            padding: '1px 4px',
-                            borderRadius: '2px',
-                          }}>{log.oldValue}</code></>}
-                          {log.newValue && <> thành <code style={{
-                            fontSize: '0.6875rem',
-                            background: 'var(--c-surface)',
-                            padding: '1px 4px',
-                            borderRadius: '2px',
-                            color: 'var(--c-accent)',
-                          }}>{log.newValue}</code></>}
-                        </>
-                      )}
-                      {log.actionType === 'DELETED' && 'đã xóa task'}
-                      <div style={{
-                        fontSize: '0.625rem',
-                        marginTop: '0.125rem',
-                        fontFamily: 'var(--font-display), Space Mono, monospace',
-                      }}>
-                        {new Date(log.createdAt).toLocaleString('vi-VN')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      fontFamily: 'var(--font-display), Space Mono, monospace',
+                      letterSpacing: '0.03em',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {tab === 'comments' ? 'Comments' : 'Activity Log'}
+                  </button>
+                ))}
               </div>
-            )}
+
+              {detailTab === 'comments' ? (
+                <CommentTab
+                  taskId={selectedTask.id}
+                  refreshTrigger={activityRefresh}
+                  onCommentCreated={() => setActivityRefresh((n) => n + 1)}
+                />
+              ) : (
+                <ActivityTab taskId={selectedTask.id} refreshTrigger={activityRefresh} />
+              )}
+            </div>
 
             {/* Delete button */}
             <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--c-border)' }}>
@@ -546,6 +568,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }

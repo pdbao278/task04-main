@@ -40,6 +40,7 @@ export interface PendingInvite {
   role: 'MANAGER' | 'MEMBER';
   expiresAt: string;
   createdAt: string;
+  inviteLink?: string;
 }
 
 export type ApiError = {

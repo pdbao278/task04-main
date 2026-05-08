@@ -25,7 +25,9 @@ function InviteContent() {
     }
 
     if (!isAuthenticated) {
-      router.push(`/login?redirect=/invite?token=${token}`);
+      // Encode full invite URL so query params aren't lost
+      const returnUrl = encodeURIComponent(`/invite?token=${token}`);
+      router.push(`/login?redirect=${returnUrl}`);
       return;
     }
 
@@ -52,6 +54,12 @@ function InviteContent() {
         setStatus('success');
         setMessage(res.data.message || 'Đã tham gia workspace thành công!');
         setWorkspaceName(res.data.workspace?.name || '');
+
+        // Auto-select the joined workspace so layout picks it up
+        if (res.data.workspace) {
+          const { selectWorkspace } = useAuthStore.getState();
+          selectWorkspace(res.data.workspace as any);
+        }
       }
     } catch (err: unknown) {
       const apiErr = err as { error?: string };

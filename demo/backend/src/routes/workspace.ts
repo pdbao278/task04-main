@@ -8,6 +8,8 @@ import {
   acceptInvite,
   changeMemberRole,
   removeMember,
+  updateWorkspace,
+  deleteWorkspace,
 } from '../controllers/workspace.controller';
 
 const router = Router();
@@ -21,6 +23,8 @@ router.post('/invites/accept', authenticate, acceptInvite);
 
 // Workspace-scoped routes
 router.get('/:id/members', authenticate, attachWorkspace, listMembers);
+router.patch('/:id', authenticate, attachWorkspace, requireRole('ADMIN'), updateWorkspace);
+router.delete('/:id', authenticate, attachWorkspace, requireRole('ADMIN'), deleteWorkspace);
 router.post('/:id/invite', authenticate, attachWorkspace, requireRole('ADMIN'), inviteMember);
 router.patch(
   '/:id/members/:memberId/role',

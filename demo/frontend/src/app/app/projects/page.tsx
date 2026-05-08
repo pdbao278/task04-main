@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Header } from '@/components/layout/header';
 import { api } from '@/lib/api-client';
 import type { Project, CreateProjectInput } from '@/types/task';
 import { useAuthStore } from '@/stores/auth-store';
 
-const COLORS = ['#e8a830', '#60a5fa', '#f87171', '#34d399', '#fbbf24', '#c084fc', '#22d3ee', '#fb923c'];
+const COLORS = ['#c8891a', '#3b82f6', '#dc2626', '#16a34a', '#ca8a04', '#9333ea', '#0891b2', '#ea580c'];
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<CreateProjectInput>({ name: '', description: '', color: '#e8a830' });
+  const [form, setForm] = useState<CreateProjectInput>({ name: '', description: '', color: '#c8891a' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const workspace = useAuthStore((s) => s.workspace);
@@ -39,7 +40,7 @@ export default function ProjectsPage() {
     setSubmitting(true);
     try {
       await api.post('/projects', form);
-      setForm({ name: '', description: '', color: '#e8a830' });
+      setForm({ name: '', description: '', color: '#c8891a' });
       setShowForm(false);
       loadProjects();
     } catch (err: unknown) {
@@ -61,24 +62,21 @@ export default function ProjectsPage() {
 
   if (loading) {
     return (
-      <div>
-        <h1 className="page-title">Projects</h1>
+      <>
+        <Header title="Projects" />
         <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
           <div className="spinner spinner-dark" style={{ margin: '0 auto 1rem' }} />
           <p style={{ color: 'var(--c-text-3)', fontSize: '0.8125rem' }}>Đang tải...</p>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div>
-      {/* Ambient orbs */}
-      <div className="orb orb-1" />
-      <div className="orb orb-2" />
+    <>
+      <Header title="Projects" />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Projects</h1>
         {workspace && ['ADMIN', 'MANAGER'].includes(workspace.role) && (
           <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
             {showForm ? '✕ Đóng' : '+ Tạo project'}
@@ -247,6 +245,6 @@ export default function ProjectsPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
