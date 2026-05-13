@@ -137,7 +137,23 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 
 
-# 12. `/spec` FR-11 — Khóa Scope Trước Khi Code
+# 12. Giới Thiệu FR-11: Báo Cáo Team (P1)
+**Từ PRD:** Manager xem trang Reports với:
+- Số task completed theo tuần (bar chart, 4 tuần gần nhất)
+- Task completion rate theo từng member (bảng)
+- Số task overdue hiện tại theo member
+
+**User Story US-05:**
+- Manager vào `/app/reports` → thấy bar chart + bảng member stats
+- Click tên member → xem My Tasks của người đó ở chế độ **read-only**
+- Dữ liệu chỉ tính trong workspace hiện tại (isolation)
+
+**Phân quyền:** chỉ `Admin` và `Manager` mới truy cập được `/app/reports`
+**Milestone:** M3 (W5–W6), cùng nhóm với FR-07 (My Tasks) và FR-08 (Team Dashboard)
+
+---
+
+# 13. `/spec` FR-11 — Khóa Scope Trước Khi Code
 - **Input:** `note/PRD.md` (chỉ phần FR-11: Reporting)
 - **Output:** `SPEC.md` — structured spec gồm:
   - **In-scope:** `/app/reports`, `GET /reports/completion`, `GET /reports/members`
@@ -148,7 +164,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 ---
 
-# 13. `/plan` FR-11 — Chia Task Có Acceptance Criteria
+# 14. `/plan` FR-11 — Chia Task Có Acceptance Criteria
 - **Input:** `SPEC.md` của FR-11
 - **Output:** `tasks/plan.md` & `tasks/todo.md` gồm 6 task:
 
@@ -166,7 +182,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 ---
 
-# 14. Các Trường Hợp Lỗi Hay Gặp (FR-11)
+# 15. Các Trường Hợp Lỗi Hay Gặp (FR-11)
 *Ví dụ thực tế khi áp dụng workflow — không phải checklist có sẵn trong repo. Repo cung cấp skill `debugging-and-error-recovery` với quy trình tổng quát: reproduce → localize → fix → guard.*
 - **Lỗi dữ liệu tuần:** API trả 3 tuần hoặc count tuần hiện tại sai.
   - Nguyên nhân thường gặp: grouping sai mốc thời gian.
@@ -186,7 +202,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 ---
 
-# 15. Gatekeeping: Khi Nào Tiếp, Khi Nào Dừng
+# 16. Gatekeeping: Khi Nào Tiếp, Khi Nào Dừng
 - Nếu `/test` trả **FAIL** → quay lại `/build` đúng task đang làm
 - Nếu `/review` trả **NO-GO** → chỉ sửa đúng blocker reviewer nêu ra
 - Nếu pass test nhưng code quá rối → `/code-simplify`, rồi bắt buộc `/test` + `/review` lại
@@ -196,7 +212,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 ---
 
-# 16. Regression Và `/ship`
+# 17. Regression Và `/ship`
 - Sau khi toàn bộ task của FR-11 đã qua `/test` và `/review`:
   - nếu có `/code-simplify` thì phải re-test trước khi ship
   - `/test FR-11 regression.`
@@ -212,7 +228,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 ---
 
-# 17. Playbook Từ PRD Đến Release
+# 18. Playbook Từ PRD Đến Release
 - `/spec` + `/plan` ở mức PRD tổng.
 - Mục tiêu: khóa boundary, mapping 12 FR thành slices, thứ tự làm.
 - **Chú thích:** agent tự đọc PRD để **đề xuất** lát cắt; người dùng **duyệt/chỉnh** lại trước khi build (user là orchestrator — §2.1 repo).
@@ -224,7 +240,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 ---
 
-# 18. Ưu Điểm & Nhược Điểm của Agent Skills KIT
+# 19. Ưu Điểm & Nhược Điểm của Agent Skills KIT
 **Ưu điểm:**
 - **Chất lượng Senior:** Code bảo hành qua TDD, 5-axis code review, và OWASP.
 - **Tính nhất quán:** AI tuân thủ workflow, hạn chế tối đa tình trạng "ảo giác".
@@ -238,4 +254,4 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 
 ---
 
-# 19. Cảm ơn đã lắng nghe
+# 20. Cảm ơn đã lắng nghe
