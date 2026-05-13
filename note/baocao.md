@@ -66,7 +66,7 @@ Nguồn: `agent-skills/AGENTS.md:68`, `agent-skills/AGENTS.md:76`, `agent-skills
 ### 2.2. Cấu trúc thư mục chính
 - `skills/`: hệ thống 20 core skills + 1 meta-skill (`using-agent-skills`)
 - `agents/`: 3 persona chuyên trách và `README.md`
-- `references/`: hiện có **5 file**; trong đó `README.md` mô tả **4 supplementary checklists**, còn `orchestration-patterns.md` là tài liệu pattern riêng
+- `references/`: hiện có **5 file**; trong đó gồm 4 file checklist/pattern bổ trợ (`accessibility-checklist.md`, `performance-checklist.md`, `security-checklist.md`, `testing-patterns.md`), còn `orchestration-patterns.md` là tài liệu pattern riêng
 - `hooks/`: chứa script và tài liệu hook
 - `.claude/commands/`: 7 command cho Claude Code
 - `.gemini/commands/`: 7 command cho Gemini CLI
