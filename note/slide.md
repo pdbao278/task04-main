@@ -45,13 +45,13 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 ---
 
 # 5. Phân Tích Các Slash Commands Cốt Lõi
-- **`/spec`:** Xác định và chốt Requirement (Source of truth).
-- **`/plan`:** Cắt nhỏ dự án thành các lát cắt dọc (Vertical Slices).
-- **`/build`:** Code TDD mức tối thiểu theo đúng scope của lát cắt.
-- **`/test`:** Kiểm chứng bằng Acceptance Criteria (Prove-It pattern).
-- **`/review`:** Rà soát code theo 5 trục (Correctness, Readability, Architecture, Security, Performance).
-- **`/code-simplify`:** Đơn giản hóa code (Chesterton's Fence).
-- **`/ship`:** Tích hợp 3 Personas để đánh giá GO/NO-GO tổng thể.
+- **`/spec`:** Hỏi rõ yêu cầu → sinh `SPEC.md` (6 phần chuẩn). **Gate: User duyệt**.
+- **`/plan`:** Đọc `SPEC.md` → vẽ dependency graph → cắt dọc. Sinh `tasks/plan.md`. **Gate: User duyệt**.
+- **`/build`:** Gọi 1 lần → AI lặp qua các task pending (RED → GREEN → Commit).
+- **`/test`:** TDD cho tính năng mới / Prove-It pattern cho bug fix.
+- **`/review`:** Rà soát 5 trục (Correctness, Readability, Architecture, Security, Performance).
+- **`/code-simplify`:** Đơn giản hóa có test bảo vệ, tự revert nếu test fail.
+- **`/ship`:** Fan-out song song 3 persona → GO/NO-GO + Rollback Plan.
 
 ---
 
@@ -66,19 +66,18 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
   - Lỗi/breakage → `debugging-and-error-recovery`
   - Review → `code-review-and-quality`
   - Deploy → `shipping-and-launch`
-- **Lifecycle sequence:** `idea-refine` → `spec-driven-development` → `planning-and-task-breakdown` → `context-engineering` → `source-driven-development` → `incremental-implementation` → `test-driven-development` → `code-review-and-quality` → `git-workflow-and-versioning` → `documentation-and-adrs` → `shipping-and-launch`
 
 ---
 
 # 7. Phân Nhóm 20 Skills Theo Lifecycle
-| Nhóm | Skills | Mô tả |
-|------|--------|-------|
-| **Define** (2) | `idea-refine`, `spec-driven-development` | Làm rõ ý tưởng và viết spec |
-| **Plan** (1) | `planning-and-task-breakdown` | Chia spec thành task nhỏ |
-| **Build** (6) | `incremental-implementation`, `test-driven-development`, `context-engineering`, `source-driven-development`, `frontend-ui-engineering`, `api-and-interface-design` | Triển khai từng lát cắt |
-| **Verify** (2) | `browser-testing-with-devtools`, `debugging-and-error-recovery` | Kiểm chứng runtime và xử lý lỗi |
-| **Review** (4) | `code-review-and-quality`, `code-simplification`, `security-and-hardening`, `performance-optimization` | Quality gate trước merge |
-| **Ship** (5) | `git-workflow-and-versioning`, `ci-cd-and-automation`, `deprecation-and-migration`, `documentation-and-adrs`, `shipping-and-launch` | Hoàn tất và release |
+| Nhóm | Số lượng | Mô tả |
+|------|----------|-------|
+| **Define** | 2 skills | Làm rõ ý tưởng và viết spec |
+| **Plan** | 1 skill | Chia spec thành task nhỏ |
+| **Build** | 6 skills | Triển khai từng lát cắt |
+| **Verify** | 2 skills | Kiểm chứng runtime và xử lý lỗi |
+| **Review** | 4 skills | Quality gate trước merge |
+| **Ship** | 5 skills | Hoàn tất và release |
 
 **Tổng: 20 core skills + 1 meta-skill = 21**
 
@@ -95,16 +94,13 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 ---
 
 # 9. Khởi tạo: `/spec` và `/plan`
-- `note/PRD.md` có **12 Functional Requirements (FR-01 -> FR-12)**.
-- Nếu ném toàn bộ 12 FR vào một prompt thì dễ tràn context và vượt scope.
-- Vì vậy cần **chiến lược chia nhỏ (vertical slicing)** trước khi build.
-- **`/spec`:** AI đọc `note/PRD.md`. Xác định Ranh giới hệ thống (Boundaries).
-  - *Ví dụ:* Không làm SSO, không làm Sub-task, không tích hợp Slack.
-  - *Kết quả:* Xuất ra `SPEC.md` làm tiêu chuẩn chất lượng.
-- **`/plan`:** Cắt dọc ứng dụng thành 8 **Vertical Slices** (A đến H).
-  - Không chia ngang kiểu "Làm BE trước, FE sau". 
-  - Mỗi Slice đều là 1 module hoạt động được từ DB lên tới UI.
-  - *Kết quả:* Sinh ra `tasks/plan.md` & `tasks/todo.md`.
+- `note/PRD.md` gồm **12 FR**. Cần **chia nhỏ (vertical slicing)** để tránh tràn context.
+- **`/spec`:** Xác định ranh giới & sinh `SPEC.md` chuẩn.
+  - *Ví dụ Boundaries:* Không làm SSO, không làm Sub-task.
+  - **Gate:** User duyệt `SPEC.md`.
+- **`/plan`:** Chỉ đọc → Vẽ dependency graph → Cắt lát dọc (từ DB lên UI).
+  - *Kết quả:* `tasks/plan.md` & `tasks/todo.md`.
+  - **Gate:** User duyệt Plan.
 
 ---
 
@@ -122,15 +118,16 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 ---
 # 11. Workflow Chuẩn Cho 1 Slice
 **Quy tắc:** lỗi ở chặng nào thì quay lại sửa ngay chặng đó.
-1. `/spec`
-2. `/plan`
-3. `/build`
-4. `/test`
-5. `/review`
-6. `/code-simplify` (nếu code rối nhưng behavior đã đúng)
-7. `/ship`
+1. `/spec` → sinh `SPEC.md`, user duyệt
+2. `/plan` → sinh `tasks/plan.md` + `tasks/todo.md`, user duyệt
+3. `/build` → **AI tự lặp qua tất cả task pending** (RED→GREEN→commit→task kế)
+4. `/test` → kiểm chứng hoặc reproduce bug (Prove-It)
+5. `/review` → 5-axis review, phân loại Critical/Important/Suggestion
+6. `/code-simplify` (nếu code rối nhưng behavior đã đúng, revert nếu test fail)
+7. `/ship` → fan-out 3 persona song song → GO/NO-GO + rollback plan
 
 **Gate:** chưa PASS test và chưa qua review thì không được qua bước sau.
+**Lưu ý:** `/build` chỉ cần gọi **1 lần** — AI tự đọc plan và lặp qua từng task.
 
 ---
 
@@ -154,13 +151,12 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 ---
 
 # 13. `/spec` FR-11 — Khóa Scope Trước Khi Code
-- **Input:** `note/PRD.md` (chỉ phần FR-11: Reporting)
-- **Output:** `SPEC.md` — structured spec gồm:
-  - **In-scope:** `/app/reports`, `GET /reports/completion`, `GET /reports/members`
-  - **Out-of-scope:** FR-01 → FR-10, FR-12, SSO, export PDF
-  - **Boundaries:** role `Admin/Manager` mới xem được, workspace isolation bắt buộc
-  - **Acceptance Criteria:** 4 tuần dữ liệu, label đúng format, click member → My Tasks read-only
-- **Gate:** chưa có `SPEC.md` được duyệt → không được chạy `/plan`
+- **Input:** `PRD.md` (chỉ FR-11).
+- **Output:** `SPEC.md` (6 phần chuẩn):
+  - *Objective:* Thống kê 4 tuần, list member read-only.
+  - *Boundaries:* **In-scope** (`/reports`), **Out-scope** (Export PDF), **Rule** (Cách ly workspace).
+  - *Các phần khác:* Commands, Structure, Style, Testing (TDD Prove-It).
+- **Gate:** Duyệt `SPEC.md` → Mới được gọi `/plan`.
 
 ---
 
@@ -177,7 +173,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 | 5 | Click member → My Tasks read-only | Điều hướng đúng, không chỉnh được filter/hành vi | Task 4 |
 | 6 | Regression FR-11 | Toàn bộ test Task 1-5 vẫn pass | Task 1-5 |
 
-- **Nguyên tắc:** không build cả 6 task cùng lúc, mỗi lần chỉ `/build` 1 task.
+- **Nguyên tắc:** `/build` gọi **1 lần** — AI tự lặp qua từng task theo thứ tự phụ thuộc. Mỗi task: viết test fail → code tối thiểu → chạy full test → commit → chuyển task kế. Nếu bước nào fail → tự chuyển sang `debugging-and-error-recovery`.
 - **Gate:** chưa có plan được duyệt → không được chạy `/build`
 
 ---
