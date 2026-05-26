@@ -1,0 +1,6 @@
+description = "Chat interactively about the codebase"
+
+prompt = """
+Invoke the understand-chat skill located at agent-skills/skills/understand-chat/SKILL.md.
+Answer questions about the codebase structure, modules, files, and interactions.
+"""

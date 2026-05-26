@@ -39,3 +39,7 @@ coverage/
 *.tsbuildinfo
 
 .cursorrules
+
+# Understand Anything
+understand-anything/
+.understand-anything/

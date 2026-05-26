@@ -1,0 +1,6 @@
+---
+description: Extract and analyze domain vocabulary
+---
+
+Invoke the understand-domain skill located at agent-skills/skills/understand-domain/SKILL.md.
+Extract business terminology, schemas, and definitions specific to this project's code.
