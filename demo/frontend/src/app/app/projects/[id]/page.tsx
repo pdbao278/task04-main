@@ -54,6 +54,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [activityRefresh, setActivityRefresh] = useState(0);
   const [detailTab, setDetailTab] = useState<'comments' | 'activity'>('comments');
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    title: string;
+    description: string;
+    priority: Priority;
+    assigneeId: string | null;
+    dueDate: string | null;
+  }>({
+    title: '',
+    description: '',
+    priority: 'MEDIUM',
+    assigneeId: null,
+    dueDate: null,
+  });
+  const [editError, setEditError] = useState('');
+  const [updatingTask, setUpdatingTask] = useState(false);
 
   async function loadData() {
     try {
@@ -131,8 +147,47 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     try {
       const res = await api.get<{ data: Task }>(`/tasks/${taskId}`);
       setSelectedTask(res.data);
+      setIsEditingTask(false);
     } catch {
       console.error('Failed to load task detail');
+    }
+  }
+
+  function startEditing() {
+    if (!selectedTask) return;
+    setEditForm({
+      title: selectedTask.title,
+      description: selectedTask.description || '',
+      priority: selectedTask.priority,
+      assigneeId: selectedTask.assigneeId || '',
+      dueDate: selectedTask.dueDate ? selectedTask.dueDate.split('T')[0] : '',
+    });
+    setEditError('');
+    setIsEditingTask(true);
+  }
+
+  async function handleUpdateTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTask) return;
+    setEditError('');
+    setUpdatingTask(true);
+    try {
+      const res = await api.patch<{ data: Task }>(`/tasks/${selectedTask.id}`, {
+        title: editForm.title,
+        description: editForm.description || null,
+        priority: editForm.priority,
+        assigneeId: editForm.assigneeId || null,
+        dueDate: editForm.dueDate ? new Date(editForm.dueDate).toISOString() : null,
+      });
+      setSelectedTask(res.data);
+      setIsEditingTask(false);
+      loadData();
+      setActivityRefresh((n) => n + 1);
+    } catch (err: unknown) {
+      const apiErr = err as { error?: string; details?: { field: string; message: string }[] };
+      setEditError(apiErr?.error || apiErr?.details?.[0]?.message || 'Lỗi khi cập nhật task');
+    } finally {
+      setUpdatingTask(false);
     }
   }
 
@@ -338,15 +393,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     fontWeight: 500,
                     margin: 0,
                     lineHeight: 1.4,
+                    minHeight: '2.25rem',
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
                   }}>{task.title}</h4>
-                  <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.375rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{
+                    display: 'flex', gap: '0.375rem', marginTop: '0.375rem',
+                    alignItems: 'center', minHeight: '1.25rem'
+                  }}>
                     <span className="badge" style={{
                       backgroundColor: `${PRIORITY_COLORS[task.priority]}20`,
                       color: PRIORITY_COLORS[task.priority],
                     }}>
                       {task.priority}
                     </span>
-                    {task.dueDate && (
+                    {task.dueDate ? (
                       <span style={{
                         fontSize: '0.6875rem',
                         fontFamily: 'var(--font-display), Space Mono, monospace',
@@ -356,18 +419,30 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         {new Date(task.dueDate).toLocaleDateString('vi-VN')}
                         {isOverdue(task.dueDate) && task.status !== 'DONE' && ' ●'}
                       </span>
+                    ) : (
+                      <span style={{
+                        fontSize: '0.6875rem',
+                        fontFamily: 'var(--font-display), Space Mono, monospace',
+                        color: 'var(--c-text-3)',
+                        opacity: 0.4,
+                      }}>
+                        Không có hạn
+                      </span>
                     )}
                   </div>
-                  {task.assignee && (
-                    <div style={{
-                      fontSize: '0.6875rem',
-                      color: 'var(--c-text-3)',
-                      marginTop: '0.25rem',
-                      fontFamily: 'var(--font-display), Space Mono, monospace',
-                    }}>
-                      → {task.assignee.name}
-                    </div>
-                  )}
+                  <div style={{
+                    fontSize: '0.6875rem',
+                    color: 'var(--c-text-3)',
+                    marginTop: '0.25rem',
+                    fontFamily: 'var(--font-display), Space Mono, monospace',
+                    minHeight: '1rem',
+                  }}>
+                    {task.assignee ? (
+                      <span>→ {task.assignee.name}</span>
+                    ) : (
+                      <span style={{ opacity: 0.4 }}>→ Chưa giao</span>
+                    )}
+                  </div>
                 </div>
               ))}
               {groupedTasks[status].length === 0 && (
@@ -415,104 +490,230 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
               marginBottom: '1.5rem',
             }}>
-              <h2 style={{
-                fontSize: '1.125rem',
-                fontFamily: 'var(--font-display), Space Mono, monospace',
-                fontWeight: 700,
-                margin: 0,
-                letterSpacing: '-0.02em',
-                lineHeight: 1.3,
-                flex: 1,
-                paddingRight: '0.5rem',
-              }}>{selectedTask.title}</h2>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setSelectedTask(null)}
-              >✕</button>
-            </div>
-
-            {/* Status changer — FR-05 with permission check */}
-            <div className="form-group">
-              <label className="label">Status</label>
-              <StatusDropdown
-                taskId={selectedTask.id}
-                currentStatus={selectedTask.status}
-                canChangeStatus={canChangeTaskStatus(selectedTask)}
-                onStatusChange={handleStatusChange}
-              />
-              {!canChangeTaskStatus(selectedTask) && (
-                <div style={{
-                  fontSize: '0.6875rem',
-                  color: 'var(--c-text-3)',
-                  marginTop: '0.25rem',
-                  fontStyle: 'italic',
-                }}>Chỉ assignee hoặc Manager mới có thể đổi trạng thái</div>
+              {isEditingTask ? (
+                <h2 style={{
+                  fontSize: '1.125rem',
+                  fontFamily: 'var(--font-display), Space Mono, monospace',
+                  fontWeight: 700,
+                  margin: 0,
+                  color: 'var(--c-accent)',
+                }}>Chỉnh sửa task</h2>
+              ) : (
+                <h2 style={{
+                  fontSize: '1.125rem',
+                  fontFamily: 'var(--font-display), Space Mono, monospace',
+                  fontWeight: 700,
+                  margin: 0,
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.3,
+                  flex: 1,
+                  paddingRight: '0.5rem',
+                }}>{selectedTask.title}</h2>
               )}
-            </div>
-
-            {/* Details grid */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem',
-              marginBottom: '1.5rem',
-              padding: '1rem',
-              background: 'var(--c-bg)',
-              borderRadius: 'var(--r-md)',
-              border: '1px solid var(--c-border)',
-            }}>
-              <div>
-                <span className="label" style={{ marginBottom: '0.25rem' }}>Priority</span>
-                <span className="badge" style={{
-                  backgroundColor: `${PRIORITY_COLORS[selectedTask.priority]}20`,
-                  color: PRIORITY_COLORS[selectedTask.priority],
-                }}>
-                  {selectedTask.priority}
-                </span>
-              </div>
-              <div>
-                <span className="label" style={{ marginBottom: '0.25rem' }}>Assignee</span>
-                <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>
-                  {selectedTask.assignee?.name || '—'}
-                </div>
-              </div>
-              <div>
-                <span className="label" style={{ marginBottom: '0.25rem' }}>Due date</span>
-                <div style={{
-                  fontWeight: 500,
-                  fontSize: '0.8125rem',
-                  color: selectedTask.dueDate && isOverdue(selectedTask.dueDate) && selectedTask.status !== 'DONE'
-                    ? 'var(--c-danger)' : 'var(--c-text)',
-                }}>
-                  {selectedTask.dueDate
-                    ? new Date(selectedTask.dueDate).toLocaleDateString('vi-VN')
-                    : '—'}
-                  {selectedTask.dueDate && isOverdue(selectedTask.dueDate) && selectedTask.status !== 'DONE' && ' (Overdue)'}
-                </div>
-              </div>
-              <div>
-                <span className="label" style={{ marginBottom: '0.25rem' }}>Created by</span>
-                <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>
-                  {selectedTask.creator?.name}
-                </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {!isEditingTask && (
+                  <>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={startEditing}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                    >
+                      ✏ Sửa
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleDeleteTask(selectedTask.id)}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: 'var(--c-danger)' }}
+                    >
+                      ✕ Xóa
+                    </button>
+                  </>
+                )}
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setSelectedTask(null);
+                    setIsEditingTask(false);
+                  }}
+                >✕</button>
               </div>
             </div>
 
-            {/* Description */}
-            {selectedTask.description && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h4 className="label">Mô tả</h4>
+            {isEditingTask ? (
+              <form onSubmit={handleUpdateTask}>
+                {editError && <div className="error-box" style={{ marginBottom: '1rem' }}>{editError}</div>}
+                
+                <div className="form-group">
+                  <label className="label">Tiêu đề *</label>
+                  <input
+                    className="input"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    placeholder="Tiêu đề task..."
+                    maxLength={200}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="label">Mô tả (Markdown)</label>
+                  <textarea
+                    className="input"
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    placeholder="Mô tả chi tiết..."
+                    rows={4}
+                    maxLength={5000}
+                  />
+                </div>
+
                 <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '1rem',
+                  marginBottom: '1.5rem',
                   padding: '1rem',
-                  backgroundColor: 'var(--c-bg)',
-                  border: '1px solid var(--c-border)',
+                  background: 'var(--c-bg)',
                   borderRadius: 'var(--r-md)',
-                  whiteSpace: 'pre-wrap',
-                  fontSize: '0.8125rem',
-                  lineHeight: 1.6,
-                  color: 'var(--c-text-2)',
+                  border: '1px solid var(--c-border)',
                 }}>
-                  {selectedTask.description}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="label">Priority</label>
+                    <select
+                      className="input"
+                      value={editForm.priority}
+                      onChange={(e) => setEditForm({ ...editForm, priority: e.target.value as Priority })}
+                    >
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="label">Assignee</label>
+                    <select
+                      className="input"
+                      value={editForm.assigneeId || ''}
+                      onChange={(e) => setEditForm({ ...editForm, assigneeId: e.target.value || null })}
+                    >
+                      <option value="">Chưa giao</option>
+                      {members.map((m) => (
+                        <option key={m.userId} value={m.userId}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
+                    <label className="label">Due date</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={editForm.dueDate || ''}
+                      onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value || null })}
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                  <button className="btn btn-primary" type="submit" disabled={updatingTask} style={{ flex: 1 }}>
+                    {updatingTask ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    onClick={() => setIsEditingTask(false)}
+                    style={{ border: '1px solid var(--c-border)' }}
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {/* Status changer — FR-05 with permission check */}
+                <div className="form-group">
+                  <label className="label">Status</label>
+                  <StatusDropdown
+                    taskId={selectedTask.id}
+                    currentStatus={selectedTask.status}
+                    canChangeStatus={canChangeTaskStatus(selectedTask)}
+                    onStatusChange={handleStatusChange}
+                  />
+                  {!canChangeTaskStatus(selectedTask) && (
+                    <div style={{
+                      fontSize: '0.6875rem',
+                      color: 'var(--c-text-3)',
+                      marginTop: '0.25rem',
+                      fontStyle: 'italic',
+                    }}>Chỉ assignee hoặc Manager mới có thể đổi trạng thái</div>
+                  )}
+                </div>
+
+                {/* Details grid */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem',
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  background: 'var(--c-bg)',
+                  borderRadius: 'var(--r-md)',
+                  border: '1px solid var(--c-border)',
+                }}>
+                  <div>
+                    <span className="label" style={{ marginBottom: '0.25rem' }}>Priority</span>
+                    <span className="badge" style={{
+                      backgroundColor: `${PRIORITY_COLORS[selectedTask.priority]}20`,
+                      color: PRIORITY_COLORS[selectedTask.priority],
+                    }}>
+                      {selectedTask.priority}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="label" style={{ marginBottom: '0.25rem' }}>Assignee</span>
+                    <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>
+                      {selectedTask.assignee?.name || '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="label" style={{ marginBottom: '0.25rem' }}>Due date</span>
+                    <div style={{
+                      fontWeight: 500,
+                      fontSize: '0.8125rem',
+                      color: selectedTask.dueDate && isOverdue(selectedTask.dueDate) && selectedTask.status !== 'DONE'
+                        ? 'var(--c-danger)' : 'var(--c-text)',
+                    }}>
+                      {selectedTask.dueDate
+                        ? new Date(selectedTask.dueDate).toLocaleDateString('vi-VN')
+                        : '—'}
+                      {selectedTask.dueDate && isOverdue(selectedTask.dueDate) && selectedTask.status !== 'DONE' && ' (Overdue)'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="label" style={{ marginBottom: '0.25rem' }}>Created by</span>
+                    <div style={{ fontWeight: 500, fontSize: '0.8125rem' }}>
+                      {selectedTask.creator?.name}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {selectedTask.description && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h4 className="label">Mô tả</h4>
+                    <div style={{
+                      padding: '1rem',
+                      backgroundColor: 'var(--c-bg)',
+                      border: '1px solid var(--c-border)',
+                      borderRadius: 'var(--r-md)',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '0.8125rem',
+                      lineHeight: 1.6,
+                      color: 'var(--c-text-2)',
+                    }}>
+                      {selectedTask.description}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Tabs: Comments + Activity — FR-06, FR-10 */}
@@ -554,16 +755,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               ) : (
                 <ActivityTab taskId={selectedTask.id} refreshTrigger={activityRefresh} />
               )}
-            </div>
-
-            {/* Delete button */}
-            <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--c-border)' }}>
-              <button
-                className="btn btn-danger btn-sm"
-                onClick={() => handleDeleteTask(selectedTask.id)}
-              >
-                ✕ Xóa task
-              </button>
             </div>
           </div>
         </>

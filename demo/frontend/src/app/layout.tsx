@@ -26,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
-      <body className={`${dmSans.variable} ${spaceMono.variable}`}>
+    <html lang="vi" suppressHydrationWarning>
+      <body className={`${dmSans.variable} ${spaceMono.variable}`} suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

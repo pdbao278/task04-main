@@ -28,7 +28,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
 1. **Surface Assumptions:** Nêu rõ các giả định, không âm thầm quyết định.
 2. **Manage Confusion Actively:** Dừng lại khi mâu thuẫn, không đoán mò.
 3. **Push Back When Warranted:** Phản đối user nếu cách tiếp cận sai lệch.
-4. **Enforce Simplicity:** Ưu tiên giải pháp đơn giản nhất (Rule of 500).
+4. **Enforce Simplicity:** Ưu tiên giải pháp đơn giản nhất.
 5. **Maintain Scope Discipline:** Chỉ làm đúng scope, không lan man.
 6. **Verify, Don't Assume:** Mọi task chưa xong cho đến khi có bằng chứng.
 
@@ -66,6 +66,7 @@ Xuyên suốt mọi hành động, AI phải tuân thủ 6 nguyên tắc:
   - Lỗi/breakage → `debugging-and-error-recovery`
   - Review → `code-review-and-quality`
   - Deploy → `shipping-and-launch`
+  -...
 
 ---
 
